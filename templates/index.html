@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>스마트 중복 파일 정리기</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body data-home="{{ home }}">
+
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <div>
+      <h1>스마트 중복 파일 정리기</h1>
+      <p>5단계 순차 비교 · 삭제 없이 <code>_Garbage_</code> 폴더로 안전 격리</p>
+    </div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="analyze" role="tab">분석 · 정리</button>
+    <button class="tab" data-tab="history" role="tab">정리 이력 · 복구</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ===================== 분석 · 정리 탭 ===================== -->
+  <section id="tab-analyze" class="tab-panel active">
+
+    <!-- 상단 컨트롤 바 -->
+    <div class="card control-bar">
+      <label class="field-label" for="rootPath">정리 대상 폴더</label>
+      <div class="control-row">
+        <input id="rootPath" type="text" spellcheck="false" autocomplete="off"
+               placeholder="예) C:\Users\me\Pictures  — 직접 입력하거나 '폴더 찾아보기'로 선택">
+        <button id="btnBrowse" class="btn">폴더 찾아보기</button>
+        <button id="btnReset" class="btn" hidden>초기화</button>
+        <button id="btnPrimary" class="btn primary">분석 시작</button>
+      </div>
+
+      <details class="tuning">
+        <summary>5단계 알고리즘 세부 튜닝</summary>
+        <div class="tuning-grid">
+          <label class="check"><input type="checkbox" id="optSub" checked> 하위 폴더 포함</label>
+          <label>최소 용량 <span class="unit"><input type="number" id="optMinKb" value="1" min="0" step="1"> KB</span></label>
+          <label><span><b>1차</b> 크기 허용 오차</span> <span class="unit"><input type="number" id="optSizeTol" value="5" min="0" max="50" step="0.5"> %</span></label>
+          <label><span><b>2차</b> 시간차 제한 <small>(0 = 제한 없음)</small></span> <span class="unit"><input type="number" id="optTime" value="0" min="0" step="1"> 시간</span></label>
+          <label><span><b>3차</b> 파일명 유사도</span> <span class="unit"><input type="number" id="optNameSim" value="65" min="30" max="100" step="1"> %</span></label>
+          <label class="check"><input type="checkbox" id="optPhash" checked> <span><b>4차</b> 이미지 pHash 사용</span></label>
+          <label class="check"><input type="checkbox" id="optHex" checked> <span><b>5차</b> Hex 정밀 검증</span></label>
+        </div>
+      </details>
+
+      <div id="progressBox" class="progress-box" hidden>
+        <div class="progress-track"><div id="progressBar" class="progress-fill"></div></div>
+        <div class="progress-text">
+          <span id="progressMsg"></span>
+          <span id="progressPct"></span>
+        </div>
+        <div id="progressFile" class="progress-file"></div>
+      </div>
+    </div>
+
+    <!-- 정리 완료 결과 -->
+    <div id="doneCard" class="card done-card" hidden></div>
+
+    <!-- 스마트 일괄 선택 툴바 -->
+    <div id="toolbar" class="card toolbar" hidden>
+      <span class="toolbar-hint">체크한 파일이 <code>_Garbage_</code>로 이동됩니다. 그룹마다 남길 파일을 고르세요.</span>
+      <div class="toolbar-buttons">
+        <button class="btn sm" data-strategy="newest">최신 파일만 남기기</button>
+        <button class="btn sm" data-strategy="oldest">오래된 파일만 남기기</button>
+        <button class="btn sm" data-strategy="shallowest">상위 폴더 원본만 남기기</button>
+        <button class="btn sm" data-strategy="largest">최대 용량·고화질만 남기기</button>
+        <span class="sep"></span>
+        <button class="btn sm" data-all="1">전체 선택</button>
+        <button class="btn sm" data-all="0">전체 해제</button>
+      </div>
+    </div>
+
+    <!-- 결과 검토 뷰 + 인스펙터 -->
+    <div id="review" class="review" hidden>
+      <div>
+        <div id="summaryLine" class="summary-line"></div>
+        <div id="groups"></div>
+        <button id="btnMore" class="btn block" hidden>그룹 더 보기</button>
+      </div>
+      <aside id="inspector" class="card inspector">
+        <h3>미리보기 · 상세 정보</h3>
+        <div id="inspPreview" class="insp-preview"><span>파일을 클릭하면 여기에 표시됩니다.</span></div>
+        <dl id="inspMeta" class="insp-meta"></dl>
+        <button id="btnOpenLocal" class="btn block" disabled>OS 기본 앱으로 열기</button>
+      </aside>
+    </div>
+
+    <div id="emptyState" class="empty-state">
+      <strong>정리할 폴더를 지정하고 '분석 시작'을 누르세요.</strong>
+      <span>분석만으로는 어떤 파일도 옮기지 않습니다. 결과를 검토한 뒤 '파일 정리 확정'을 눌러야 이동합니다.</span>
+    </div>
+  </section>
+
+  <!-- ===================== 정리 이력 · 복구 탭 ===================== -->
+  <section id="tab-history" class="tab-panel">
+    <div id="historyStats" class="stats"></div>
+    <div class="history-head">
+      <h2>세션 이력</h2>
+      <div>
+        <button id="btnRefreshHistory" class="btn sm">새로고침</button>
+        <button id="btnRestoreAll" class="btn sm success" disabled>격리 파일 전체 복구</button>
+      </div>
+    </div>
+    <div id="historyProgress" class="card progress-box" hidden>
+      <div class="progress-track"><div id="histBar" class="progress-fill"></div></div>
+      <div class="progress-text"><span id="histMsg"></span></div>
+    </div>
+    <div id="historyList"></div>
+  </section>
+</main>
+
+<!-- 하단 플로팅 바 -->
+<div id="floatBar" class="float-bar" hidden>
+  <div class="float-info">
+    <span>이동 예정 <b id="selCount">0</b>개</span>
+    <span>확보 예정 용량 <b id="selBytes">0 B</b></span>
+  </div>
+  <button id="btnConfirmFloat" class="btn danger">파일 정리 확정</button>
+</div>
+
+<!-- 폴더 찾아보기 모달 -->
+<dialog id="browseDialog" class="modal">
+  <div class="modal-head">
+    <h3>폴더 선택</h3>
+    <button class="icon-btn" data-close aria-label="닫기">✕</button>
+  </div>
+  <div id="browseShortcuts" class="chips"></div>
+  <div class="browse-path">
+    <button id="browseUp" class="btn sm">상위 폴더</button>
+    <code id="browseCurrent"></code>
+  </div>
+  <ul id="browseList" class="browse-list"></ul>
+  <div class="modal-foot">
+    <button class="btn" data-close>취소</button>
+    <button id="browseSelect" class="btn primary">이 폴더 선택</button>
+  </div>
+</dialog>
+
+<!-- 확인 모달 -->
+<dialog id="confirmDialog" class="modal narrow">
+  <div class="modal-head"><h3 id="confirmTitle"></h3></div>
+  <div id="confirmBody" class="confirm-body"></div>
+  <div class="modal-foot">
+    <button class="btn" data-close>취소</button>
+    <button id="confirmOk" class="btn danger"></button>
+  </div>
+</dialog>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

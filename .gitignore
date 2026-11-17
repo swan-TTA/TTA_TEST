@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# 로컬 데이터베이스 (내 PC 파일 경로·정리 이력 포함 — 공개 금지)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# 정리기 격리 폴더
+_Garbage_/
+
+# 환경 변수 / 비밀값
+.env
+.env.*
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Vercel
+.vercel/
